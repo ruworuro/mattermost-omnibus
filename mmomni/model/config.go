@@ -29,6 +29,9 @@ type Config struct {
 	EnableLocalMode     *bool   `yaml:"enable_local_mode"`
 
 	NginxTemplate *string `yaml:"nginx_template,omitempty"`
+
+	TaigaInstalled     *bool   `yaml:"taiga_installed"`
+	TaigaEnabled       *bool   `yaml:"taiga_enabled"`
 }
 
 func ReadConfig(path string) (*Config, error) {
@@ -89,6 +92,14 @@ func (c *Config) SetDefaults() {
 
 	if c.NginxTemplate == nil {
 		c.NginxTemplate = NewString("")
+	}
+
+	if c.TaigaInstalled == nil {
+		c.TaigaInstalled = NewBool(false)
+	}
+
+	if c.TaigaEnabled == nil {
+		c.TaigaEnabled = NewBool(false)
 	}
 }
 
