@@ -130,3 +130,8 @@
             state: restarted
             enabled: yes
             daemon_reload: yes
+
+    - name: "Taiga"
+      block:
+        - include: taiga/reconfigure.yml
+      when: taiga_enabled

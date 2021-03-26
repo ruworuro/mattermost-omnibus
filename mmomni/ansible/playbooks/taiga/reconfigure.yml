@@ -1,0 +1,44 @@
+- name: "taiga"
+  vars:
+    - webroot: /var/www
+    - taiga_webroot: '{{ webroot }}/taiga/dist'
+    - taiga_nginx_file: /etc/nginx/inc/taiga-front.conf
+  block:
+    - name: "taiga-frontend"
+      block:
+        - name: "Download Taiga Front"
+          block:
+            - uri:
+                url: https://api.github.com/repos/taigaio/taiga-front/tags
+                headers:
+                  Accept: application/vnd.github.v3+json
+                return_content: yes
+              register: taiga_tags
+            - file:
+                path: '{{ webroot }}'
+                state: directory
+                owner: nginx
+            - unarchive:
+                src: https://github.com/taigaio/taiga-front-dist/archive/refs/tags/6.0.8.tar.gz 
+                dest: '{{ webroot }}'
+                remote_src: yes
+                extra_opts:
+                  - -U
+                  - --recursive-unlink
+                  - --transform
+                  - 's:^taiga[^/]\+:taiga:'
+        - name: "Add Taiga front configure"
+          template:
+            src: conf.json
+            dest: '{{ taiga_webroot }}/conf.json'
+        - name: "Add taiga nginx conf"
+          template:
+            src: nginx.conf
+            dest: '{{ taiga_nginx_file }}'
+        - name: "Chango root in index.html"
+          lineinfile:
+            path: '{{ taiga_webroot }}/index.html'
+            insertafter: '^\s+<title>Taiga.*$'
+            regex: '^\s+<base href=.*'
+            line: '    <base href="/taiga/" />'
+
