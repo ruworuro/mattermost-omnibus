@@ -1,6 +1,6 @@
 {
-    "api": "/api/v1/",
-    "eventsUrl": "/events/",
+    "api": "/taiga/api/v1/",
+    "eventsUrl": "/taiga/events/",
     "eventsMaxMissedHeartbeats": 5,
     "eventsHeartbeatIntervalTime": 60000,
     "eventsReconnectTryInterval": 10000,

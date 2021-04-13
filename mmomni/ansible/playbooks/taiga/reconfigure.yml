@@ -1,10 +1,10 @@
 - name: "taiga"
-  vars:
-    - webroot: /var/www
-    - taiga_webroot: '{{ webroot }}/taiga/dist'
-    - taiga_nginx_file: /etc/nginx/inc/taiga-front.conf
   block:
     - name: "taiga-frontend"
+      vars:
+        - webroot: /var/www/taiga
+        - taiga_webroot: '{{ webroot }}/dist'
+        - taiga_nginx_file: /etc/nginx/inc/taiga-front.conf
       block:
         - name: "Download Taiga Front"
           block:
@@ -13,7 +13,7 @@
                 headers:
                   Accept: application/vnd.github.v3+json
                 return_content: yes
-              register: taiga_tags
+              register: taiga_front_tags
             - file:
                 path: '{{ webroot }}'
                 state: directory
@@ -21,19 +21,20 @@
             - unarchive:
                 src: https://github.com/taigaio/taiga-front-dist/archive/refs/tags/6.0.8.tar.gz 
                 dest: '{{ webroot }}'
+                list_files: yes
                 remote_src: yes
                 extra_opts:
                   - -U
                   - --recursive-unlink
-                  - --transform
-                  - 's:^taiga[^/]\+:taiga:'
+                  - --strip-components=1
+              register: taiga_front_files
         - name: "Add Taiga front configure"
           template:
             src: conf.json
             dest: '{{ taiga_webroot }}/conf.json'
         - name: "Add taiga nginx conf"
           template:
-            src: nginx.conf
+            src: nginx/front.conf
             dest: '{{ taiga_nginx_file }}'
         - name: "Chango root in index.html"
           lineinfile:
@@ -41,4 +42,122 @@
             insertafter: '^\s+<title>Taiga.*$'
             regex: '^\s+<base href=.*'
             line: '    <base href="/taiga/" />'
-
+    - name: "taiga-backend"
+      vars:
+        - taiga_back_root: /opt/taiga-back
+        - virtualenv_dir: /home/mattermost/.venvs/taiga
+        - debug: False
+        - sample_data_load: False
+        - taiga_nginx_file: /etc/nginx/inc/taiga-back.conf
+        - taiga_back_media: /home/mattermost/taiga-back-media
+      block:
+        - name: "Download Taiga Backend"
+          block:
+            - uri:
+                url: https://api.github.com/repos/taigaio/taiga-back/tags
+                headers:
+                  Accept: application/vnd.github.v3+json
+                return_content: yes
+              register: taiga_back_tags
+            - file:
+                path: '{{ taiga_back_root }}'
+                state: directory
+                owner: mattermost
+            - unarchive:
+                src: https://github.com/taigaio/taiga-back/archive/refs/tags/6.0.7.tar.gz
+                dest: '{{ taiga_back_root }}'
+                list_files: yes
+                remote_src: yes
+                extra_opts:
+                  - -U
+                  - --recursive-unlink
+                  - --strip-components=1
+              register: taiga_back_files
+        - name: "Add taiga nginx conf"
+          template:
+            src: nginx/back.conf
+            dest: '{{ taiga_nginx_file }}'
+        - name: Create PSQL user
+          become: true
+          become_user: postgres
+          postgresql_user:
+            name: taiga
+            password: taiga
+        - name: Add database and privs to taiga
+          become: true
+          become_user: postgres
+          postgresql_db:
+            name: taiga
+            encoding: UTF-8
+            lc_collate: en_US.UTF-8
+            lc_ctype: en_US.UTF-8
+            template: template0
+            owner: taiga
+        - name: Template local.py
+          template:
+            src: local.py
+            dest: "{{ taiga_back_root }}/settings/local.py"
+            owner: mattermost
+            group: mattermost
+        - name: install requirementes
+          pip:
+            chdir: /opt/taiga-back
+            requirements: requirements.txt
+            virtualenv: "{{ virtualenv_dir }}"
+            virtualenv_python: /usr/bin/python3.8
+        - name: Django migrate
+          django_manage:
+            command: migrate
+            app_path: "{{ taiga_back_root }}"
+            virtualenv: "{{ virtualenv_dir }}"
+          environment:
+            DJANGO_SETTINGS_MODULE: "settings.local"
+        - name: Django loaddata "initial_user"
+          django_manage:
+            command: loaddata
+            fixtures: "initial_user"
+            app_path: "{{ taiga_back_root }}"
+            virtualenv: "{{ virtualenv_dir }}"
+            #when: add_database is defined and add_database is changed
+          environment:
+            DJANGO_SETTINGS_MODULE: "settings.local"
+        - name: Django loaddata "initial_project_templates"
+          django_manage:
+            command: loaddata
+            fixtures: "initial_project_templates"
+            app_path: "{{ taiga_back_root }}"
+            virtualenv: "{{ virtualenv_dir }}"
+            #when: add_database is defined and add_database is changed
+          environment:
+            DJANGO_SETTINGS_MODULE: "settings.local"
+        - name: Django compilemessages.
+          django_manage:
+            command: "compilemessages"
+            app_path: "{{ taiga_back_root }}"
+            virtualenv: "{{ virtualenv_dir }}"
+          notify:
+            - restart taiga
+            - restart taiga-celery
+          environment:
+            DJANGO_SETTINGS_MODULE: "settings.local"
+        - name: Django collectstatic.
+          django_manage:
+            command: collectstatic
+            app_path: "{{ taiga_back_root }}"
+            virtualenv: "{{ virtualenv_dir }}"
+          environment:
+            DJANGO_SETTINGS_MODULE: "settings.local"
+        - name: Django optional sample_data load.
+          django_manage:
+            command: "sample_data"
+            app_path: "{{ taiga_back_root }}"
+            virtualenv: "{{ virtualenv_dir }}"
+          when: sample_data_load
+          environment:
+            DJANGO_SETTINGS_MODULE: "settings.local"
+        - name: Create directory to store media files
+          file:
+            path: "{{ taiga_back_media }}"
+            state: directory
+            owner: mattermost
+            group: mattermost
