@@ -1,0 +1,15 @@
+[Unit]
+Description=taiga_back
+After=network.target
+
+[Service]
+User=mattermost
+Environment=PYTHONUNBUFFERED=true
+Environment=DJANGO_SETTINGS_MODULE=settings.local
+WorkingDirectory={{ taiga_back_root }}
+ExecStart={{ virtualenv_dir }}/bin/gunicorn --workers 4 --max-requests 3600 --max-requests-jitter 360 --timeout 60 -b 127.0.0.1:8001 taiga.wsgi
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -161,3 +161,17 @@
             state: directory
             owner: mattermost
             group: mattermost
+        - name: "Generate systemd service"
+          template:
+            src: systemd/taiga.service
+            dest: /etc/systemd/system/taiga.service
+            owner: root
+            group: root
+            mode: 0644
+
+        - name: "Enable and restart Taiga Backend service"
+          systemd:
+            name: taiga
+            state: restarted
+            enabled: yes
+            daemon_reload: yes
