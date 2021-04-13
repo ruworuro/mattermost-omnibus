@@ -175,3 +175,13 @@
             state: restarted
             enabled: yes
             daemon_reload: yes
+        - name: "Change root for api in urls.py"
+          lineinfile:
+            path: '{{ taiga_back_root }}/taiga/urls.py'
+            regex: '^\s+path(.api/v1/.,.*'
+            line: "    path('taiga/api/v1/', include(router.urls)),"
+        - name: "Change root for admin in urls.py"
+          lineinfile:
+            path: '{{ taiga_back_root }}/taiga/urls.py'
+            regex: '^\s+path(.admin/.,.*'
+            line: "    path('taiga/admin/', admin.site.urls),"
