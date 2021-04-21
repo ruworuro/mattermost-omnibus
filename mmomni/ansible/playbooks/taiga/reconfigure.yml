@@ -36,6 +36,10 @@
           template:
             src: nginx/front.conf
             dest: '{{ taiga_nginx_file }}'
+          register: taiga_front_nginx_conf
+        - name: "Restart NGINX service with the new configuration"
+          systemd: "name=nginx state=restarted"
+          when: taiga_front_nginx_conf.changed
         - name: "Chango root in index.html"
           lineinfile:
             path: '{{ taiga_webroot }}/index.html'
@@ -77,6 +81,10 @@
           template:
             src: nginx/back.conf
             dest: '{{ taiga_nginx_file }}'
+          register: taiga_back_nginx_conf
+        - name: "Restart NGINX service with the new configuration"
+          systemd: "name=nginx state=restarted"
+          when: taiga_front_nginx_conf.changed
         - name: Create PSQL user
           become: true
           become_user: postgres
